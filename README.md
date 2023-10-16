@@ -1,10 +1,10 @@
-### 🚧🚧 Looking for collaborators and financial backers 🚧🚧
+### 🚧🚧 Looking for collaborators and backers 🚧🚧
 
 See this [issue](https://github.com/react-native-datetimepicker/datetimepicker/issues/313).
 
-### Financial backers
+### Backers
 
-Support us with a monthly donation to help us keep the module maintained. [Become a backer on OpenCollective](https://opencollective.com/react-native-datetimepicker) or [sponsor us on GitHub Sponsors](https://github.com/sponsors/react-native-datetimepicker).
+Support us with a monthly donation and help us continue our activities. [Become a backer on OpenCollective](https://opencollective.com/react-native-datetimepicker) or [sponsor us on GitHub Sponsors](https://github.com/sponsors/react-native-datetimepicker).
 
 <a href="https://opencollective.com/react-native-datetimepicker/donate" target="_blank">
   <img src="https://opencollective.com/react-native-datetimepicker/backers.svg?width=890" width=890 />
@@ -66,7 +66,6 @@ React Native date & time picker component for iOS, Android and Windows.
     - [`value` (`required`)](#value-required)
     - [`maximumDate` (`optional`)](#maximumdate-optional)
     - [`minimumDate` (`optional`)](#minimumdate-optional)
-    - [`timeZoneName` (`optional`, `iOS or Android only`)](#timeZoneName-optional-ios-and-android-only)
     - [`timeZoneOffsetInMinutes` (`optional`, `iOS or Android only`)](#timezoneoffsetinminutes-optional-ios-and-android-only)
     - [`timeZoneOffsetInSeconds` (`optional`, `Windows only`)](#timezoneoffsetinsecond-optional-windows-only)
     - [`dayOfWeekFormat` (`optional`, `Windows only`)](#dayOfWeekFormat-optional-windows-only)
@@ -94,16 +93,12 @@ React Native date & time picker component for iOS, Android and Windows.
 ## Requirements
 
 - Only Android API level >=21 (Android 5), iOS >= 11 are supported.
-- Tested with Xcode 14.0 and RN 0.71.4. Other configurations are very likely to work as well but have not been tested.
-
-The module supports the [new React Native architecture](https://reactnative.dev/docs/next/the-new-architecture/why) (Fabric rendering of iOS components, and turbomodules on Android). If you are using the new architecture, you will need to use React Native 0.71.4 or higher.
+- Tested with Xcode 14.0 and RN 0.70. Other configurations are very likely to work as well but have not been tested.
 
 ## Expo users notice
 
 This module is part of Expo Managed Workflow - [see docs](https://docs.expo.io/versions/latest/sdk/date-time-picker/). However, Expo SDK in the Managed Workflow may not contain the latest version of the module and therefore, the newest features and bugfixes may not be available in Expo Managed Workflow.
 If you use the Managed Workflow, use the command `expo install @react-native-community/datetimepicker` (not `yarn` or `npm`) to install this module - Expo will automatically install the latest version compatible with your Expo SDK (which may _not_ be the latest version of the module available).
-
-If you're using a [Dev Client](https://docs.expo.dev/development/create-development-builds/), rebuild the Dev Client after installing the dependencies.
 
 If you're using the [`expo prebuild`](https://docs.expo.dev/workflow/prebuild/) command and building your native app projects (e.g. with EAS Build or locally), you can use the latest version of the module.
 
@@ -169,11 +164,11 @@ export const App = () => {
   };
 
   return (
-    <SafeAreaView>
+    <View>
       <Button onPress={showDatepicker} title="Show date picker!" />
       <Button onPress={showTimepicker} title="Show time picker!" />
       <Text>selected: {date.toLocaleString()}</Text>
-    </SafeAreaView>
+    </View>
   );
 };
 ```
@@ -193,7 +188,10 @@ export const App = () => {
   };
 
   const showMode = (currentMode) => {
-    setShow(true);
+    if (Platform.OS === 'android') {
+      setShow(false);
+      // for iOS, add a button that closes the picker
+    }
     setMode(currentMode);
   };
 
@@ -206,7 +204,7 @@ export const App = () => {
   };
 
   return (
-    <SafeAreaView>
+    <View>
       <Button onPress={showDatepicker} title="Show date picker!" />
       <Button onPress={showTimepicker} title="Show time picker!" />
       <Text>selected: {date.toLocaleString()}</Text>
@@ -219,7 +217,7 @@ export const App = () => {
           onChange={onChange}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 ```
@@ -310,13 +308,11 @@ This is called when the user changes the date or time in the UI. It receives the
 It is also called when user dismisses the picker, which you can detect by checking the `event.type` property.
 The values can be: `'set' | 'dismissed' | 'neutralButtonPressed'`. (`neutralButtonPressed` is only available on Android).
 
-The `utcOffset` field is only available on Android and iOS. It is the offset in minutes between the selected date and UTC time.
-
 ```js
 const setDate = (event: DateTimePickerEvent, date: Date) => {
   const {
     type,
-    nativeEvent: {timestamp, utcOffset},
+    nativeEvent: {timestamp},
   } = event;
 };
 
@@ -347,21 +343,10 @@ Defines the minimum date that can be selected. Note that on Android, this only w
 <RNDateTimePicker minimumDate={new Date(1950, 0, 1)} />
 ```
 
-#### `timeZoneName` (`optional`, `iOS and Android only`)
-
-Allows changing of the time zone of the date picker. By default, it uses the device's time zone.
-Use the time zone name from the IANA (TZDB) database name in https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
-
-```js
-<RNDateTimePicker timeZoneName={'Europe/Prague'} />
-```
-
 #### `timeZoneOffsetInMinutes` (`optional`, `iOS and Android only`)
 
-Allows changing of the time zone of the date picker. By default, it uses the device's time zone.
-We **strongly** recommend using `timeZoneName` prop instead; this prop has known issues in the android implementation (eg. [#528](https://github.com/react-native-datetimepicker/datetimepicker/issues/528)).
-
-This prop will be removed in a future release.
+Allows changing of the timeZone of the date picker. By default, it uses the device's time zone.
+We strongly recommend avoiding this prop on android because of known issues in the implementation (eg. [#528](https://github.com/react-native-datetimepicker/datetimepicker/issues/528)).
 
 ```js
 // GMT+1
@@ -488,7 +473,7 @@ Changes the label of the positive button.
 Changes the label of the negative button.
 
 ```js
-<RNDateTimePicker negativeButtonLabel="Negative" />
+<RNDateTimePicker positiveButtonLabel="Negative" />
 ```
 
 #### `neutralButtonLabel` (`optional`, `Android only`, deprecated)
@@ -530,15 +515,6 @@ Alternatively, use the `themeVariant` prop.
 #### `disabled` (`optional`, `iOS only`)
 
 If true, the user won't be able to interact with the view.
-
-#### `testID` (`optional`)
-
-Usually used by app automation frameworks.
-Fully supported on iOS. On Android, only supported for `mode="date"`.
-
-```js
-<RNDateTimePicker testID="datePicker" />
-```
 
 #### `View Props` (`optional`, `iOS only`)
 

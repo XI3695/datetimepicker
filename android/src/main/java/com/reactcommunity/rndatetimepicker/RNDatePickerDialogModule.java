@@ -22,6 +22,8 @@ import com.facebook.react.common.annotations.VisibleForTesting;
 import com.facebook.react.module.annotations.ReactModule;
 
 import static com.reactcommunity.rndatetimepicker.Common.dismissDialog;
+import static com.reactcommunity.rndatetimepicker.KeepDateInRangeListener.isDateAfterMaxDate;
+import static com.reactcommunity.rndatetimepicker.KeepDateInRangeListener.isDateBeforeMinDate;
 
 import java.util.Calendar;
 
@@ -29,20 +31,19 @@ import java.util.Calendar;
  * {@link NativeModule} that allows JS to show a native date picker dialog and get called back when
  * the user selects a date.
  */
-@ReactModule(name = DatePickerModule.NAME)
-public class DatePickerModule extends NativeModuleDatePickerSpec {
+@ReactModule(name = RNDatePickerDialogModule.FRAGMENT_TAG)
+public class RNDatePickerDialogModule extends ReactContextBaseJavaModule {
 
   @VisibleForTesting
-  public static final String NAME = "RNCDatePicker";
+  public static final String FRAGMENT_TAG = "RNDatePickerAndroid";
 
-  public DatePickerModule(ReactApplicationContext reactContext) {
+  public RNDatePickerDialogModule(ReactApplicationContext reactContext) {
     super(reactContext);
   }
 
-  @NonNull
   @Override
-  public String getName() {
-    return NAME;
+  public @NonNull String getName() {
+    return RNDatePickerDialogModule.FRAGMENT_TAG;
   }
 
   private class DatePickerDialogListener implements OnDateSetListener, OnDismissListener, OnClickListener {
@@ -59,15 +60,31 @@ public class DatePickerModule extends NativeModuleDatePickerSpec {
     @Override
     public void onDateSet(DatePicker view, int year, int month, int day) {
       if (!mPromiseResolved && getReactApplicationContext().hasActiveReactInstance()) {
-        final RNDate date = new RNDate(mArgs);
-        Calendar calendar = Calendar.getInstance(Common.getTimeZone(mArgs));
-        calendar.set(year, month, day, date.hour(), date.minute(), 0);
-        calendar.set(Calendar.MILLISECOND, 0);
-
         WritableMap result = new WritableNativeMap();
         result.putString("action", RNConstants.ACTION_DATE_SET);
-        result.putDouble("timestamp", calendar.getTimeInMillis());
-        result.putDouble("utcOffset", calendar.getTimeZone().getOffset(calendar.getTimeInMillis()) / 1000 / 60);
+        result.putInt("year", year);
+        result.putInt("month", month);
+        result.putInt("day", day);
+
+        // https://issuetracker.google.com/issues/169602180
+        // TODO revisit day, month, year with timezoneoffset fixes
+        if (isDateAfterMaxDate(mArgs, year, month, day)) {
+          Calendar maxDate = Calendar.getInstance();
+          maxDate.setTimeInMillis(mArgs.getLong(RNConstants.ARG_MAXDATE));
+
+          result.putInt("year", maxDate.get(Calendar.YEAR));
+          result.putInt("month", maxDate.get(Calendar.MONTH) );
+          result.putInt("day", maxDate.get(Calendar.DAY_OF_MONTH));
+        }
+
+        if (isDateBeforeMinDate(mArgs, year, month, day)) {
+          Calendar minDate = Calendar.getInstance();
+          minDate.setTimeInMillis(mArgs.getLong(RNConstants.ARG_MINDATE));
+
+          result.putInt("year", minDate.get(Calendar.YEAR));
+          result.putInt("month", minDate.get(Calendar.MONTH) );
+          result.putInt("day", minDate.get(Calendar.DAY_OF_MONTH));
+        }
 
         mPromise.resolve(result);
         mPromiseResolved = true;
@@ -98,7 +115,7 @@ public class DatePickerModule extends NativeModuleDatePickerSpec {
   @ReactMethod
   public void dismiss(Promise promise) {
     FragmentActivity activity = (FragmentActivity) getCurrentActivity();
-    dismissDialog(activity, NAME, promise);
+    dismissDialog(activity, FRAGMENT_TAG, promise);
   }
   /**
    * Show a date picker dialog.
@@ -118,9 +135,6 @@ public class DatePickerModule extends NativeModuleDatePickerSpec {
    *   <li>
    *      {@code display} To set the date picker display to 'calendar/spinner/default'
    *   </li>
-   *   <li>
-   *      {@code testID} testID for testing with e.g. detox.
-   *   </li>
    * </ul>
    *
    * @param promise This will be invoked with parameters action, year,
@@ -133,39 +147,42 @@ public class DatePickerModule extends NativeModuleDatePickerSpec {
     FragmentActivity activity = (FragmentActivity) getCurrentActivity();
     if (activity == null) {
       promise.reject(
-              RNConstants.ERROR_NO_ACTIVITY,
-              "Tried to open a DatePicker dialog while not attached to an Activity");
+        RNConstants.ERROR_NO_ACTIVITY,
+        "Tried to open a DatePicker dialog while not attached to an Activity");
       return;
     }
 
     final FragmentManager fragmentManager = activity.getSupportFragmentManager();
 
-    UiThreadUtil.runOnUiThread(() -> {
-      RNDatePickerDialogFragment oldFragment =
-              (RNDatePickerDialogFragment) fragmentManager.findFragmentByTag(NAME);
+    UiThreadUtil.runOnUiThread(new Runnable() {
+      @Override
+      public void run() {
+        RNDatePickerDialogFragment oldFragment =
+                (RNDatePickerDialogFragment) fragmentManager.findFragmentByTag(FRAGMENT_TAG);
 
-      Bundle arguments = createFragmentArguments(options);
+        if (oldFragment != null) {
+          oldFragment.update(createFragmentArguments(options));
+          return;
+        }
 
-      if (oldFragment != null) {
-        oldFragment.update(arguments);
-        return;
+        RNDatePickerDialogFragment fragment = new RNDatePickerDialogFragment();
+
+        fragment.setArguments(createFragmentArguments(options));
+
+        final DatePickerDialogListener listener = new DatePickerDialogListener(promise, createFragmentArguments(options));
+        fragment.setOnDismissListener(listener);
+        fragment.setOnDateSetListener(listener);
+        fragment.setOnNeutralButtonActionListener(listener);
+        fragment.show(fragmentManager, FRAGMENT_TAG);
       }
-
-      RNDatePickerDialogFragment fragment = new RNDatePickerDialogFragment();
-
-      fragment.setArguments(arguments);
-
-      final DatePickerDialogListener listener = new DatePickerDialogListener(promise, arguments);
-      fragment.setOnDismissListener(listener);
-      fragment.setOnDateSetListener(listener);
-      fragment.setOnNeutralButtonActionListener(listener);
-      fragment.show(fragmentManager, NAME);
     });
   }
 
   private Bundle createFragmentArguments(ReadableMap options) {
-    final Bundle args = Common.createFragmentArguments(options);
-
+    final Bundle args = new Bundle();
+    if (options.hasKey(RNConstants.ARG_VALUE) && !options.isNull(RNConstants.ARG_VALUE)) {
+      args.putLong(RNConstants.ARG_VALUE, (long) options.getDouble(RNConstants.ARG_VALUE));
+    }
     if (options.hasKey(RNConstants.ARG_MINDATE) && !options.isNull(RNConstants.ARG_MINDATE)) {
       args.putLong(RNConstants.ARG_MINDATE, (long) options.getDouble(RNConstants.ARG_MINDATE));
     }
@@ -180,9 +197,6 @@ public class DatePickerModule extends NativeModuleDatePickerSpec {
     }
     if (options.hasKey(RNConstants.ARG_TZOFFSET_MINS) && !options.isNull(RNConstants.ARG_TZOFFSET_MINS)) {
       args.putLong(RNConstants.ARG_TZOFFSET_MINS, (long) options.getDouble(RNConstants.ARG_TZOFFSET_MINS));
-    }
-    if (options.hasKey(RNConstants.ARG_TESTID) && !options.isNull(RNConstants.ARG_TESTID)) {
-      args.putString(RNConstants.ARG_TESTID, options.getString(RNConstants.ARG_TESTID));
     }
     return args;
   }

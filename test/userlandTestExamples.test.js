@@ -9,7 +9,6 @@ import DateTimePicker from '../src/index';
 // $FlowExpectedError: complains about import path
 import {DateTimePickerAndroid} from '../src/DateTimePickerAndroid.android';
 
-// $FlowExpectedError: module treated as any
 import {render, fireEvent, waitFor} from '@testing-library/react-native';
 import {createDateTimeSetEvtParams} from '../src/index';
 import {mockAndroidDialogDateChange, mockAndroidDialogDismissal} from '../jest';
@@ -77,7 +76,7 @@ describe('userland tests', () => {
     fireEvent(
       UNSAFE_getByType(DateTimePicker),
       'onChange',
-      ...createDateTimeSetEvtParams(date, 0),
+      ...createDateTimeSetEvtParams(date),
     );
     getByText('1560000000');
   });

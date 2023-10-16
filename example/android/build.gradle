@@ -1,6 +1,7 @@
 buildscript {
     def androidTestAppDir = "../../node_modules/react-native-test-app/android"
     apply(from: "${androidTestAppDir}/dependencies.gradle")
+    apply(from: "${androidTestAppDir}/test-app-util.gradle")
 
     repositories {
         mavenCentral()
@@ -8,13 +9,23 @@ buildscript {
     }
 
     dependencies {
-        getReactNativeDependencies().each { dependency ->
-            classpath(dependency)
+        classpath("com.android.tools.build:gradle:${androidPluginVersion}")
+
+        if (isNewArchitectureEnabled(project)) {
+            classpath("com.facebook.react:react-native-gradle-plugin")
+            classpath("de.undercouch:gradle-download-task:5.1.2")
         }
     }
 }
 
+def REACT_NATIVE_VERSION = new File(['node', '--print',"JSON.parse(require('fs').readFileSync(require.resolve('react-native/package.json'), 'utf-8')).version"].execute(null, rootDir).text.trim())
+
 allprojects {
+    configurations.all {
+      resolutionStrategy {
+        force "com.facebook.react:react-native:" + REACT_NATIVE_VERSION
+      }
+    }
     repositories {
         maven {
             // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
@@ -53,6 +64,8 @@ allprojects {
 
             project.dependencies {
                 androidTestImplementation('com.wix:detox:+')
+                // pinning soloader to 0.10.4 fixes problem with detox "couldn't find DSO to load: libhermes.so" https://github.com/wix/Detox/issues/3487
+                implementation 'com.facebook.soloader:soloader:0.10.4+'
             }
         }
     }

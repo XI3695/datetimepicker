@@ -2,7 +2,7 @@
  * @format
  * @flow strict-local
  */
-import {ANDROID_DISPLAY, ANDROID_MODE} from './constants';
+import {ANDROID_DISPLAY, ANDROID_MODE, MIN_MS} from './constants';
 import pickers from './picker';
 import type {AndroidNativeProps, DateTimePickerResult} from './types';
 import {sharedPropsValidation} from './utils';
@@ -16,7 +16,7 @@ type ProcessedButton = {
   textColor: $Call<typeof processColor>,
 };
 
-type OpenParams = {
+type Params = {
   value: Timestamp,
   display: AndroidNativeProps['display'],
   is24Hour: AndroidNativeProps['is24Hour'],
@@ -24,8 +24,6 @@ type OpenParams = {
   maximumDate: AndroidNativeProps['maximumDate'],
   minuteInterval: AndroidNativeProps['minuteInterval'],
   timeZoneOffsetInMinutes: AndroidNativeProps['timeZoneOffsetInMinutes'],
-  timeZoneName: AndroidNativeProps['timeZoneName'],
-  testID: AndroidNativeProps['testID'],
   dialogButtons: {
     positive: ProcessedButton,
     negative: ProcessedButton,
@@ -33,8 +31,7 @@ type OpenParams = {
   },
 };
 
-export type PresentPickerCallback =
-  (OpenParams) => Promise<DateTimePickerResult>;
+export type PresentPickerCallback = (Params) => Promise<DateTimePickerResult>;
 
 function getOpenPicker(
   mode: AndroidNativeProps['mode'],
@@ -47,9 +44,8 @@ function getOpenPicker(
         is24Hour,
         minuteInterval,
         timeZoneOffsetInMinutes,
-        timeZoneName,
         dialogButtons,
-      }: OpenParams) =>
+      }: Params) =>
         // $FlowFixMe - `AbstractComponent` [1] is not an instance type.
         pickers[mode].open({
           value,
@@ -57,7 +53,6 @@ function getOpenPicker(
           minuteInterval,
           is24Hour,
           timeZoneOffsetInMinutes,
-          timeZoneName,
           dialogButtons,
         });
     default:
@@ -67,10 +62,8 @@ function getOpenPicker(
         minimumDate,
         maximumDate,
         timeZoneOffsetInMinutes,
-        timeZoneName,
         dialogButtons,
-        testID,
-      }: OpenParams) =>
+      }: Params) =>
         // $FlowFixMe - `AbstractComponent` [1] is not an instance type.
         pickers[ANDROID_MODE.date].open({
           value,
@@ -78,11 +71,23 @@ function getOpenPicker(
           minimumDate,
           maximumDate,
           timeZoneOffsetInMinutes,
-          timeZoneName,
           dialogButtons,
-          testID,
         });
   }
+}
+
+function timeZoneOffsetDateSetter(
+  date: Date,
+  timeZoneOffsetInMinutes: ?number,
+): Date {
+  if (typeof timeZoneOffsetInMinutes === 'number') {
+    // FIXME this causes a bug. repro: set tz offset to zero, and then keep opening and closing the calendar picker
+    // https://github.com/react-native-datetimepicker/datetimepicker/issues/528
+    const offset = date.getTimezoneOffset() + timeZoneOffsetInMinutes;
+    const shiftedDate = new Date(date.getTime() - offset * MIN_MS);
+    return shiftedDate;
+  }
+  return date;
 }
 
 function validateAndroidProps(props: AndroidNativeProps) {
@@ -104,4 +109,4 @@ function validateAndroidProps(props: AndroidNativeProps) {
     );
   }
 }
-export {getOpenPicker, validateAndroidProps};
+export {getOpenPicker, timeZoneOffsetDateSetter, validateAndroidProps};
